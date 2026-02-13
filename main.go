@@ -35,5 +35,5 @@ func main() {
 	})
 
 	log.Printf("DataFlow server starting on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	log.Fatal(router.Run(":" + port))
 }
