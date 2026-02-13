@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/dataflow/internal/api"
@@ -20,14 +21,29 @@ func main() {
 	engine := pipeline.NewEngine()
 	go engine.Start()
 
-	// Setup HTTP router
 	router := gin.Default()
+
+	// Limit request body size to 1MB to prevent resource exhaustion
+	router.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		c.Next()
+	})
+
+	api.SetupRoutes(router, engine)
 	api.SetupRoutes(router, engine)
 
 	// Serve static files for web dashboard
 	router.Static("/static", "./web/static")
-	router.LoadHTMLGlob("web/templates/*")
-
+	log.Printf("DataFlow server starting on port %s", port)
+	srv := &http.Server{
+		Addr:           ":" + port,
+		Handler:        router,
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	log.Fatal(srv.ListenAndServe())
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "dashboard.html", gin.H{
 			"title": "DataFlow Pipeline Dashboard",

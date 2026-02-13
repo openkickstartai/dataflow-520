@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -39,41 +39,58 @@ func createPipeline(engine *pipeline.Engine) gin.HandlerFunc {
 			return
 		}
 
-		// Generate UUID if not provided
+		// Generate UUID if not provided; validate format if user-supplied
 		if req.ID == "" {
 			req.ID = uuid.New().String()
-		}
-
-		// Validate required fields
+		} else if _, err := uuid.Parse(req.ID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pipeline ID must be a valid UUID"})
+			return
 		if req.Name == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pipeline name is required"})
 			return
 		}
 
-		if err := engine.CreatePipeline(&req); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if len(req.Name) > 256 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pipeline name exceeds maximum length of 256 characters"})
+			return
+		}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pipeline name is required"})
 			return
 		}
 
-		c.JSON(http.StatusCreated, req)
-	}
-}
-
+		if err := engine.CreatePipeline(&req); err != nil {
 func getPipeline(engine *pipeline.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		pipeline, err := engine.GetPipeline(id)
+		if _, err := uuid.Parse(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pipeline ID format"})
+			return
+		}
+		p, err := engine.GetPipeline(id)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": "pipeline not found"})
 			return
 		}
 
-		c.JSON(http.StatusOK, pipeline)
-	}
-}
-
 func executePipeline(engine *pipeline.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		id := c.Param("id")
+		if _, err := uuid.Parse(id); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid pipeline ID format"})
+			return
+		}
+		if err := engine.ExecutePipeline(id); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "pipeline not found or execution failed"})
+			return
+		}
+
+func healthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "healthy",
+		"service":   "dataflow",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+}
 		id := c.Param("id")
 		if err := engine.ExecutePipeline(id); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
