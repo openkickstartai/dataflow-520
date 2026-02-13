@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -88,6 +88,6 @@ func healthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",
 		"service":   "dataflow",
-		"timestamp": strconv.FormatInt(c.Request.Context().Value("timestamp").(int64), 10),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	})
 }
